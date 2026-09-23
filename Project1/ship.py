@@ -14,10 +14,10 @@ class ShipGrid:
     
     def __init__(self, D:int):
         self.D = D
-        self.grid = self._grid_generation(D)
+        self.grid = self._generate_grid(D)
         
 
-    def _grid_generation(self,D:int)->np.ndarray:
+    def _generate_grid(self,D:int)->np.ndarray:
         # small size(1 byte) of each cell so we can use larger D
         layout= np.full((D,D),CellState.BLOCKED,dtype=np.int8)
         # question - do we include the edges?
@@ -100,11 +100,24 @@ class ShipGrid:
         coords = np.argwhere(matched)
         
         return count, coords
+    def is_open(self, r: int, c: int) -> bool:
+        return 0 <= r < self.D and 0 <= c < self.D and self.grid[r, c] == CellState
     
-
-layout = ShipGrid(100)   
-print(layout)
-plt.imshow(layout.grid, cmap='viridis') 
+    def get_open_cells(self):
+        return [tuple(coord) for coord in np.argwhere(self.grid == CellState.OPEN)]
+    
+    def get_open_neighbors(self, cell: tuple) -> list:
+        r, c = cell
+        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        return [
+            (r + dr, c + dc)
+            for dr, dc in directions
+            if self.is_open(r + dr, c + dc)
+        ]
+    
+Ship1 = ShipGrid(100)   
+print(Ship1)
+plt.imshow(Ship1.grid, cmap='viridis') 
 plt.colorbar() 
 plt.title("2D Array Visualization (imshow)")
 plt.show()
