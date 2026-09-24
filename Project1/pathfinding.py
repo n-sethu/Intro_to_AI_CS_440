@@ -5,6 +5,7 @@ from collections import deque
 # for bot 1 just iterate through list and check if (r,c) is burning at that timestep
 # bot 2 - recalculate from the new startPos each time (checks if each (r,c) is adjacent to a burning cell)
 # bot 3: edit the risk parameter
+# @zahra -> can you do A*
 
 class Pathfinder:
     
