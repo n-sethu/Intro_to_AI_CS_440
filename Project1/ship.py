@@ -114,10 +114,13 @@ class ShipGrid:
             for dr, dc in directions
             if self.is_open(r + dr, c + dc)
         ]
+GRID_SIZE=100
+def main():
+    Ship1 = ShipGrid(GRID_SIZE)   
+    print(Ship1)
+    plt.imshow(Ship1.grid, cmap='viridis') 
+    plt.colorbar() 
+    plt.title("2D Array Visualization (imshow)")
+    plt.show()
     
-Ship1 = ShipGrid(100)   
-print(Ship1)
-plt.imshow(Ship1.grid, cmap='viridis') 
-plt.colorbar() 
-plt.title("2D Array Visualization (imshow)")
-plt.show()
+    
