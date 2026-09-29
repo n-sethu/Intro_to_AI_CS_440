@@ -12,7 +12,7 @@ class Pathfinder:
     @staticmethod
     def next_move_bfs(ship_grid, start: tuple, goal: tuple, blocked_set:set):
         if start == goal:
-            return start
+            return [start]
         queue = deque([start])
         parent = {start:None}
         
@@ -26,10 +26,10 @@ class Pathfinder:
                     path.append(curr)
                     curr = parent[curr]
                 path.reverse()
-                return path[3]
+                return path
             for neighbor in ship_grid.get_open_neighbors(curr):
                 if neighbor not in parent and neighbor not in blocked_set:
                     parent[neighbor]= curr
                     queue.append(neighbor)
             
-        return None
+        return None 
