@@ -101,10 +101,12 @@ class ShipGrid:
         
         return count, coords
     def is_open(self, r: int, c: int) -> bool:
-        return 0 <= r < self.D and 0 <= c < self.D and self.grid[r, c] == CellState
+        return 0 <= r < self.D and 0 <= c < self.D and self.grid[r, c] == CellState.OPEN
     
     def get_open_cells(self):
-        return [tuple(coord) for coord in np.argwhere(self.grid == CellState.OPEN)]
+        #return [tuple(coord) for coord in np.argwhere(self.grid == CellState.OPEN)]
+        # ruturn plain python ints instead of numpy ints
+        return [(int(r), int(c)) for r, c in np.argwhere(self.grid == CellState.OPEN)]
     
     def get_open_neighbors(self, cell: tuple) -> list:
         r, c = cell
@@ -114,13 +116,32 @@ class ShipGrid:
             for dr, dc in directions
             if self.is_open(r + dr, c + dc)
         ]
+
+    # check that all open cells are reacheable from every other
+    def is_connected(self) -> bool:
+        cells = self.get_open_cells()
+        seen = {cells[0]}
+        stack = [cells[0]]
+        while stack:
+            cur = stack.pop()
+            for nb in self.get_open_neighbors(cur):
+                if nb not in seen:
+                    seen.add(nb)
+                    stack.append(nb)
+        return len(seen) == len(cells)
+    
 GRID_SIZE=100
 def main():
     Ship1 = ShipGrid(GRID_SIZE)   
-    print(Ship1)
+    # print(Ship1)
     plt.imshow(Ship1.grid, cmap='viridis') 
-    plt.colorbar() 
+    # plt.colorbar() 
     plt.title("2D Array Visualization (imshow)")
     plt.show()
+
+# prevent ship plot popping up on every import
+if __name__ == "__main__":
+    main()
+    
     
     
