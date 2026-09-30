@@ -25,7 +25,7 @@ class ShipGrid:
         y = rd.randint(1,D-2)
         layout[x,y]=CellState.OPEN
         
-        # First step: blocked cells with one open neighbot
+        # First step: blocked cells with one open neighbor
         L, coords = self._get_L(layout)
         while(L>0):
             to_open = rd.randint(0,L-1)
@@ -101,7 +101,7 @@ class ShipGrid:
         
         return count, coords
     def is_open(self, r: int, c: int) -> bool:
-        return 0 <= r < self.D and 0 <= c < self.D and self.grid[r, c] == CellState
+        return 0 <= r < self.D and 0 <= c < self.D and self.grid[r, c] == CellState.OPEN
     
     def get_open_cells(self):
         return [tuple(coord) for coord in np.argwhere(self.grid == CellState.OPEN)]
@@ -114,13 +114,19 @@ class ShipGrid:
             for dr, dc in directions
             if self.is_open(r + dr, c + dc)
         ]
-GRID_SIZE=100
+GRID_SIZE=10
+
 def main():
     Ship1 = ShipGrid(GRID_SIZE)   
-    print(Ship1)
+    print(Ship1.grid)
     plt.imshow(Ship1.grid, cmap='viridis') 
     plt.colorbar() 
     plt.title("2D Array Visualization (imshow)")
     plt.show()
+    print("hello")
+
+
+if __name__ == "__main__":
+    main()
     
     
