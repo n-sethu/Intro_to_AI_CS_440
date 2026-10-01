@@ -38,6 +38,8 @@ class ShipGrid:
         # Dead end step
         F, F_coords = self._get_F(layout)
         goal = F//2
+        previous_distance = F - goal
+        no_progress = 0
         while(F>goal):
             chosen_f = rd.randint(0,F-1)
             F_r, F_c = F_coords[chosen_f]
@@ -54,6 +56,14 @@ class ShipGrid:
                 layout[nr, nc] = CellState.OPEN
                 
             F, F_coords = self._get_F(layout)
+            distance = F - goal
+            if distance < previous_distance:
+                no_progress = 0
+            else:
+                no_progress += 1
+            if no_progress == 4:
+                break
+            previous_distance = distance
             
         return layout
             
