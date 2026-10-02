@@ -24,7 +24,9 @@ class Bot1(BaseBot):
     #Bot1 plans its path once, avoiding the initial fire cell
     def __init__(self, ship, start, button, initial_fire):
         super().__init__(ship, start, button, initial_fire)
-        path = Pathfinder.next_move_bfs(ship, start, button, {initial_fire})
+        path = Pathfinder.next_move_astar(ship, start, button, {initial_fire})
+        # path = Pathfinder.next_move_bfs(ship, start, button, {initial_fire})
+
         self.path = path if path is not None else [start]
         self.indx = 0
 
@@ -39,7 +41,9 @@ class Bot2(BaseBot):
     #Bot2 re plans its path at every step, avoiding all buring cells
     def choose_move(self, fire):
         blocked = set(fire.burning_cells)
-        path = Pathfinder.next_move_bfs(self.ship, self.position, self.button, blocked)
+        # path = Pathfinder.next_move_bfs(self.ship, self.position, self.button, blocked)
+        path = Pathfinder.next_move_astar(self.ship, self.position, self.button, blocked)
+
         self.position = self.first_step(path)
         return self.position
 
@@ -48,9 +52,13 @@ class Bot3(BaseBot):
     def choose_move(self, fire):
         burning = set(fire.burning_cells)
         cautious = burning | fire.neighbors_of_fire()
-        path = Pathfinder.next_move_bfs(self.ship, self.position, self.button, cautious)
+        path = Pathfinder.next_move_astar(self.ship, self.position, self.button, cautious)
+        # path = Pathfinder.next_move_bfs(self.ship, self.position, self.button, cautious)
+
         if path is None:                   #not possible so revert to Bot2 behavior
-            path = Pathfinder.next_move_bfs(self.ship, self.position, self.button, burning)
+            # path = Pathfinder.next_move_bfs(self.ship, self.position, self.button, burning)
+            path = Pathfinder.next_move_astar(self.ship, self.position, self.button, burning)
+
         self.position = self.first_step(path)
         return self.position
 

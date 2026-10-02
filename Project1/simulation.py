@@ -48,7 +48,7 @@ if __name__ == "__main__":
     from bots import Bot1, Bot2, Bot3
 
     n = 200
-    for q in (0.1, 0.3, 0.5):
+    for q in (0.1, 0.3, 0.5,0.7):
         wins = compare_bots([Bot1, Bot2, Bot3], D=30, q=q, n_trials=n)
         print(f"q={q}: " + ", ".join(f"{k}={v}/{n}" for k, v in wins.items()))
         
