@@ -45,10 +45,11 @@ def compare_bots(bot_classes, D, q, n_trials):
     return wins
 
 if __name__ == "__main__":
-    from bots import Bot1, Bot2, Bot3
+    from bots import Bot1, Bot2, Bot3, Bot4
 
-    n = 200
+    n = 20
     for q in (0.1, 0.3, 0.5,0.7):
-        wins = compare_bots([Bot1, Bot2, Bot3], D=30, q=q, n_trials=n)
+        # Compare all four bot strategies under the same trial seeds.
+        wins = compare_bots([Bot1, Bot2, Bot3, Bot4], D=50, q=q, n_trials=n)
         print(f"q={q}: " + ", ".join(f"{k}={v}/{n}" for k, v in wins.items()))
         

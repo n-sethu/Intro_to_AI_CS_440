@@ -62,4 +62,68 @@ class Bot3(BaseBot):
         self.position = self.first_step(path)
         return self.position
 
-#bot4 next
+class Bot4(BaseBot):
+    """Plan through predicted fire risk in space and time."""
+
+    def __init__(
+        self,
+        ship,
+        start,
+        button,
+        initial_fire,
+        replanning_interval=3,
+        risk_threshold=0.4,
+        risk_weight=5.0,
+        heuristic_weight=1.0,
+    ):
+        super().__init__(ship, start, button, initial_fire)
+        self.replanning_interval = max(1, replanning_interval)
+        self.risk_threshold = risk_threshold
+        self.risk_weight = risk_weight
+        self.heuristic_weight = heuristic_weight
+        self.steps_since_plan = self.replanning_interval
+        self.path = None
+        self.path_index = 0
+
+    def _plan(self, fire):
+        distance = abs(self.position[0] - self.button[0]) + abs(
+            self.position[1] - self.button[1]
+        )
+        horizon = max(2 * distance + 10, self.ship.D)
+        risk = Pathfinder.predict_fire_risk(
+            self.ship, fire.burning_cells, fire.q, horizon
+        )
+
+        # Relax the hard cutoff only when the preferred safety bound has no path.
+        thresholds = [self.risk_threshold, 0.6, 0.8, 1.0]
+        for threshold in thresholds:
+            path = Pathfinder.next_move_risk_astar(
+                self.ship,
+                self.position,
+                self.button,
+                risk,
+                threshold,
+                self.risk_weight,
+                self.heuristic_weight,
+            )
+            if path is not None:
+                self.path = path
+                self.path_index = 0
+                self.steps_since_plan = 0
+                return
+
+        self.path = None
+        self.path_index = 0
+        self.steps_since_plan = 0
+
+    def choose_move(self, fire):
+        # Replan from the observed fire after each configured batch of moves.
+        if self.path is None or self.steps_since_plan >= self.replanning_interval:
+            self._plan(fire)
+
+        if self.path is not None and self.path_index + 1 < len(self.path):
+            self.path_index += 1
+            self.position = self.path[self.path_index]
+
+        self.steps_since_plan += 1
+        return self.position

@@ -11,6 +11,108 @@ from heapq import heappop, heappush
 class Pathfinder:
 
     @staticmethod
+    def predict_fire_risk(ship_grid, burning_cells: set, q: float, horizon: int):
+        """Estimate the probability that each open cell is burning at each time."""
+        # Each layer is the predicted fire state at one future timestep.
+        risk = [
+            [[0.0 for _ in range(ship_grid.D)] for _ in range(ship_grid.D)]
+            for _ in range(horizon + 1)
+        ]
+
+        for row, col in burning_cells:
+            risk[0][row][col] = 1.0
+
+        open_cells = ship_grid.get_open_cells()
+        # Propagate risk using the independent-neighbor ignition approximation.
+        for time in range(horizon):
+            for row, col in open_cells:
+                current_risk = risk[time][row][col]
+                if current_risk >= 1.0:
+                    risk[time + 1][row][col] = 1.0
+                    continue
+
+                no_ignition = 1.0
+                for neighbor in ship_grid.get_open_neighbors((row, col)):
+                    neighbor_risk = risk[time][neighbor[0]][neighbor[1]]
+                    no_ignition *= 1.0 - q * neighbor_risk
+
+                ignition_risk = 1.0 - no_ignition
+                risk[time + 1][row][col] = (
+                    current_risk + (1.0 - current_risk) * ignition_risk
+                )
+
+        return risk
+
+    @staticmethod
+    def next_move_risk_astar(
+        ship_grid,
+        start: tuple[int, int],
+        goal: tuple[int, int],
+        risk: list[list[list[float]]],
+        risk_threshold: float,
+        risk_weight: float,
+        heuristic_weight: float = 1.0,
+    ):
+        """Find a path through (row, col, time) states using predicted risk."""
+        if start == goal:
+            return [start]
+
+        horizon = len(risk) - 1
+
+        def heuristic(cell):
+            return abs(cell[0] - goal[0]) + abs(cell[1] - goal[1])
+
+        # Time is part of the state because the same cell can have different risk later.
+        start_state: tuple[int, int, int] = (start[0], start[1], 0)
+        counter = 0
+        open_set: list[tuple[float, int, int, tuple[int, int, int]]] = [
+            (heuristic_weight * heuristic(start), heuristic(start), counter, start_state)
+        ]
+        parent: dict[tuple[int, int, int], tuple[int, int, int] | None] = {
+            start_state: None
+        }
+        g_score: dict[tuple[int, int, int], float] = {start_state: 0.0}
+
+        while open_set:
+            _, _, _, current = heappop(open_set)
+            current_cost = g_score[current]
+            row, col, time = current
+
+            if (row, col) == goal:
+                path = []
+                while current is not None:
+                    path.append((current[0], current[1]))
+                    current = parent[current]
+                path.reverse()
+                return path
+
+            if time >= horizon:
+                continue
+
+            # Staying put is allowed, so waiting is considered alongside movement.
+            next_cells = ship_grid.get_open_neighbors((row, col)) + [(row, col)]
+            for next_row, next_col in next_cells:
+                next_time = time + 1
+                next_risk = risk[next_time][next_row][next_col]
+                # Reject unsafe arrivals before applying the softer risk cost.
+                if next_risk > risk_threshold:
+                    continue
+
+                next_state = (next_row, next_col, next_time)
+                tentative_cost = current_cost + 1.0 + risk_weight * next_risk
+                if tentative_cost >= g_score.get(next_state, float("inf")):
+                    continue
+
+                g_score[next_state] = tentative_cost
+                parent[next_state] = current
+                counter += 1
+                next_heuristic = heuristic((next_row, next_col))
+                priority = tentative_cost + heuristic_weight * next_heuristic
+                heappush(open_set, (priority, next_heuristic, counter, next_state))
+
+        return None
+
+    @staticmethod
     def next_move_astar(ship_grid, start: tuple, goal: tuple, blocked_set: set):
         if start == goal:
             return [start]
