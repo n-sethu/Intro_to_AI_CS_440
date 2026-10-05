@@ -56,7 +56,7 @@ def build_scenarios(D, n_trials, seed):
 
 def run_sweep(
 	D=75,
-	n_trials=10,
+	n_trials=1000,
 	q_values=DEFAULT_Q_VALUES,
 	seed=440,
 	max_steps=100000,
@@ -66,6 +66,12 @@ def run_sweep(
 	"""Run every bot on the same scenarios and return timed result records."""
 	scenarios = build_scenarios(D, n_trials, seed)
 	results = []
+	progress_interval = max(1, n_trials // 10)
+	print(
+		f"Starting sweep: {len(q_values)} q values, "
+		f"{len(bot_classes)} bots, {n_trials} trials each",
+		flush=True,
+	)
 
 	for q in q_values:
 		for bot_class in bot_classes:
@@ -77,7 +83,9 @@ def run_sweep(
 			}
 			started = perf_counter()
 
-			for ship, start, button, fire_start, fire_seed in scenarios:
+			for trial_number, (ship, start, button, fire_start, fire_seed) in enumerate(
+				scenarios, start=1
+			):
 				success, reason = run_trial(
 					ship,
 					bot_class,
@@ -92,6 +100,13 @@ def run_sweep(
 				if success != (reason == "button"):
 					raise RuntimeError(
 						f"{bot_class.__name__} returned inconsistent trial result"
+					)
+				if trial_number % progress_interval == 0 or trial_number == n_trials:
+					print(
+						f"Progress q={q:.2f} bot={bot_class.__name__}: "
+						f"{trial_number}/{n_trials} trials "
+						f"({perf_counter() - started:.1f}s)",
+						flush=True,
 					)
 
 			elapsed_seconds = perf_counter() - started
@@ -118,7 +133,8 @@ def print_result(result):
 		f"success={result.successes}/{result.trials} "
 		f"rate={result.success_rate:.3f} "
 		f"time={result.elapsed_seconds:.3f}s "
-		f"avg={result.average_seconds:.3f}s"
+		f"avg={result.average_seconds:.3f}s",
+		flush=True,
 	)
 
 
@@ -161,6 +177,12 @@ def parse_args():
 	parser.add_argument("--trials", type=int, default=10)
 	parser.add_argument("--seed", type=int, default=440)
 	parser.add_argument("--max-steps", type=int, default=100000)
+	parser.add_argument(
+		"--q",
+		type=float,
+		action="append",
+		help="Run only the specified fire-spread probability; may be repeated",
+	)
 	parser.add_argument("--csv", default="bot4_sweep.csv")
 	return parser.parse_args()
 
@@ -174,6 +196,7 @@ if __name__ == "__main__":
 	run_sweep(
 		D=args.grid_size,
 		n_trials=args.trials,
+		q_values=args.q if args.q else DEFAULT_Q_VALUES,
 		seed=args.seed,
 		max_steps=args.max_steps,
 		csv_path=args.csv,
