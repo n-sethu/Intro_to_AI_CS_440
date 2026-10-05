@@ -53,7 +53,7 @@ class Pathfinder:
         risk_weight: float,
         heuristic_weight: float = 1.0,
     ):
-        """Find a path through (row, col, time) states using predicted risk."""
+        """Search time states; pruning assumes nondecreasing risk and nonnegative costs."""
         if start == goal:
             return [start]
 
@@ -72,11 +72,19 @@ class Pathfinder:
             start_state: None
         }
         g_score: dict[tuple[int, int, int], float] = {start_state: 0.0}
+        # Keep tradeoffs: an earlier arrival only dominates if it costs no more.
+        arrivals = {start: [(0, 0.0)]}
 
         while open_set:
             _, _, _, current = heappop(open_set)
             current_cost = g_score[current]
             row, col, time = current
+            cell = (row, col)
+            # Skip queued entries superseded by cheaper or earlier arrivals.
+            if (time, current_cost) not in arrivals.get(cell, []):
+                continue
+            if time + heuristic(cell) > horizon:
+                continue
 
             if (row, col) == goal:
                 path = []
@@ -89,10 +97,14 @@ class Pathfinder:
             if time >= horizon:
                 continue
 
-            # Staying put is allowed, so waiting is considered alongside movement.
-            next_cells = ship_grid.get_open_neighbors((row, col)) + [(row, col)]
+            # Risk only increases: waiting adds cost without improving safety.
+            next_cells = ship_grid.get_open_neighbors((row, col))
             for next_row, next_col in next_cells:
                 next_time = time + 1
+                next_heuristic = heuristic((next_row, next_col))
+                # Even an obstacle-free route must fit within the forecast.
+                if next_time + next_heuristic > horizon:
+                    continue
                 next_risk = risk[next_time][next_row][next_col]
                 # Reject unsafe arrivals before applying the softer risk cost.
                 if next_risk > risk_threshold:
@@ -103,10 +115,19 @@ class Pathfinder:
                 if tentative_cost >= g_score.get(next_state, float("inf")):
                     continue
 
+                cell = (next_row, next_col)
+                known = arrivals.get(cell, [])
+                if any(t <= next_time and cost <= tentative_cost for t, cost in known):
+                    continue
+                arrivals[cell] = [
+                    (t, cost) for t, cost in known
+                    if not (next_time <= t and tentative_cost <= cost)
+                ]
+                arrivals[cell].append((next_time, tentative_cost))
+
                 g_score[next_state] = tentative_cost
                 parent[next_state] = current
                 counter += 1
-                next_heuristic = heuristic((next_row, next_col))
                 priority = tentative_cost + heuristic_weight * next_heuristic
                 heappush(open_set, (priority, next_heuristic, counter, next_state))
 
