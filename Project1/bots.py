@@ -71,7 +71,7 @@ class Bot4(BaseBot):
         start,
         button,
         initial_fire,
-        replanning_interval=3,
+        replanning_interval=1,
         risk_threshold=0.4,
         risk_weight=5.0,
         heuristic_weight=1.0,
@@ -86,16 +86,24 @@ class Bot4(BaseBot):
         self.path_index = 0
 
     def _plan(self, fire):
-        distance = abs(self.position[0] - self.button[0]) + abs(
-            self.position[1] - self.button[1]
+        burning = set(fire.burning_cells)
+        shortest_path = Pathfinder.next_move_astar(
+            self.ship, self.position, self.button, burning
         )
-        horizon = max(2 * distance + 10, self.ship.D)
+        self.path = None
+        self.path_index = 0
+        self.steps_since_plan = 0
+        if shortest_path is None:
+            return
+        # Maze routes can be much longer than their Manhattan distance.
+        distance = len(shortest_path) - 1
+        horizon = max(distance + 10, 2 * distance)
         risk = Pathfinder.predict_fire_risk(
             self.ship, fire.burning_cells, fire.q, horizon
         )
 
         # Relax the hard cutoff only when the preferred safety bound has no path.
-        thresholds = [self.risk_threshold, 0.6, 0.8, 1.0]
+        thresholds = sorted({self.risk_threshold, 0.6, 0.8, 0.99})
         for threshold in thresholds:
             path = Pathfinder.next_move_risk_astar(
                 self.ship,
@@ -105,6 +113,7 @@ class Bot4(BaseBot):
                 threshold,
                 self.risk_weight,
                 self.heuristic_weight,
+                blocked_set=burning,
             )
             if path is not None:
                 self.path = path
@@ -112,18 +121,25 @@ class Bot4(BaseBot):
                 self.steps_since_plan = 0
                 return
 
-        self.path = None
-        self.path_index = 0
-        self.steps_since_plan = 0
+        # If every predicted route exceeds the cutoff, take a currently clear
+        # escape route rather than wait for the fire to reach us.
+        self.path = shortest_path
 
     def choose_move(self, fire):
         # Replan from the observed fire after each configured batch of moves.
-        if self.path is None or self.steps_since_plan >= self.replanning_interval:
+        stale_path = self.path is not None and any(
+            cell in fire.burning_cells
+            for cell in self.path[self.path_index + 1:]
+        )
+        if (self.path is None or stale_path
+                or self.steps_since_plan >= self.replanning_interval):
             self._plan(fire)
 
         if self.path is not None and self.path_index + 1 < len(self.path):
-            self.path_index += 1
-            self.position = self.path[self.path_index]
+            next_cell = self.path[self.path_index + 1]
+            if next_cell not in fire.burning_cells:
+                self.path_index += 1
+                self.position = next_cell
 
         self.steps_since_plan += 1
         return self.position

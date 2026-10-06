@@ -107,7 +107,7 @@ class Pathfinder:
                     continue
                 next_risk = risk[next_time][next_row][next_col]
                 # Reject unsafe arrivals before applying the softer risk cost.
-                if next_risk > risk_threshold:
+                if risk[0][next_row][next_col] >= 1.0 or next_risk > risk_threshold:
                     continue
 
                 next_state = (next_row, next_col, next_time)
