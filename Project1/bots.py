@@ -79,6 +79,7 @@ class Bot4(BaseBot):
         super().__init__(ship, start, button, initial_fire)
         self.replanning_interval = max(1, replanning_interval)
         self.risk_threshold = risk_threshold
+        self.active_threshold = None
         self.risk_weight = risk_weight
         self.heuristic_weight = heuristic_weight
         self.steps_since_plan = self.replanning_interval
@@ -86,6 +87,7 @@ class Bot4(BaseBot):
         self.path_index = 0
 
     def _plan(self, fire):
+        self.active_threshold = None
         burning = set(fire.burning_cells)
         shortest_path = Pathfinder.next_move_astar(
             self.ship, self.position, self.button, burning
@@ -116,6 +118,7 @@ class Bot4(BaseBot):
                 blocked_set=burning,
             )
             if path is not None:
+                self.active_threshold = threshold
                 self.path = path
                 self.path_index = 0
                 self.steps_since_plan = 0

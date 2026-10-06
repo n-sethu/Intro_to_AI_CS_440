@@ -52,11 +52,13 @@ class Pathfinder:
         risk_threshold: float,
         risk_weight: float,
         heuristic_weight: float = 1.0,
+        blocked_set: set | None = None,
     ):
         """Search time states; pruning assumes nondecreasing risk and nonnegative costs."""
         if start == goal:
             return [start]
 
+        blocked = blocked_set if blocked_set is not None else set()
         horizon = len(risk) - 1
 
         def heuristic(cell):
@@ -100,6 +102,8 @@ class Pathfinder:
             # Risk only increases: waiting adds cost without improving safety.
             next_cells = ship_grid.get_open_neighbors((row, col))
             for next_row, next_col in next_cells:
+                if (next_row, next_col) in blocked:
+                    continue
                 next_time = time + 1
                 next_heuristic = heuristic((next_row, next_col))
                 # Even an obstacle-free route must fit within the forecast.

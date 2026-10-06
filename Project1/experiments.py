@@ -86,7 +86,7 @@ def run_sweep(
 			for trial_number, (ship, start, button, fire_start, fire_seed) in enumerate(
 				scenarios, start=1
 			):
-				success, reason = run_trial(
+				success, reason, bot = run_trial(
 					ship,
 					bot_class,
 					start,

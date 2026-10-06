@@ -43,7 +43,13 @@ def compare_bots(bot_classes, D, q, n_trials):
             ok, how, bot= run_trial(ship, cls, start, button, fire_start, q, seed)
             wins[cls.__name__] += ok
             if cls.__name__ == "Bot4":
-                print(i, ": ", ok, how, cls.__name__, f"risk_threshold={bot.risk_threshold}")
+                if bot.active_threshold is not None:
+                    strategy = f"active_threshold={bot.active_threshold}"
+                elif bot.path is not None:
+                    strategy = "shortest-path fallback"
+                else:
+                    strategy = "no available path"
+                print(i, ": ", ok, how, cls.__name__, strategy)
             else:
                 print(i, ": ", ok, how, cls.__name__)
 
@@ -52,7 +58,7 @@ def compare_bots(bot_classes, D, q, n_trials):
 if __name__ == "__main__":
     from bots import Bot1, Bot2, Bot3, Bot4
 
-    n = 20
+    n = 100
     for q in (0.3, 0.5,0.7):
         # Compare all four bot strategies under the same trial seeds.
         wins = compare_bots([Bot1, Bot2, Bot3, Bot4], D=50, q=q, n_trials=n)
