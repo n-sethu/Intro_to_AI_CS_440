@@ -78,7 +78,7 @@ def run_sweep(
 			started = perf_counter()
 
 			for ship, start, button, fire_start, fire_seed in scenarios:
-				success, reason = run_trial(
+				success, reason, _bot = run_trial(
 					ship,
 					bot_class,
 					start,

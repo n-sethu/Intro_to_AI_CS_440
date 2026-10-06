@@ -23,6 +23,7 @@ class Pathfinder:
             risk[0][row][col] = 1.0
 
         open_cells = ship_grid.get_open_cells()
+        neighbors = {cell: ship_grid.get_open_neighbors(cell) for cell in open_cells}
         # Propagate risk using the independent-neighbor ignition approximation.
         for time in range(horizon):
             for row, col in open_cells:
@@ -32,7 +33,7 @@ class Pathfinder:
                     continue
 
                 no_ignition = 1.0
-                for neighbor in ship_grid.get_open_neighbors((row, col)):
+                for neighbor in neighbors[(row, col)]:
                     neighbor_risk = risk[time][neighbor[0]][neighbor[1]]
                     no_ignition *= 1.0 - q * neighbor_risk
 
@@ -52,8 +53,12 @@ class Pathfinder:
         risk_threshold: float,
         risk_weight: float,
         heuristic_weight: float = 1.0,
+        blocked_set: set | None = None,
     ):
         """Find a path through (row, col, time) states using predicted risk."""
+        blocked_set = blocked_set or set()
+        if start in blocked_set or goal in blocked_set:
+            return None
         if start == goal:
             return [start]
 
@@ -72,6 +77,7 @@ class Pathfinder:
             start_state: None
         }
         g_score: dict[tuple[int, int, int], float] = {start_state: 0.0}
+        arrivals = {start: [(0, 0.0)]}
 
         while open_set:
             _, _, _, current = heappop(open_set)
@@ -89,19 +95,34 @@ class Pathfinder:
             if time >= horizon:
                 continue
 
-            # Staying put is allowed, so waiting is considered alongside movement.
-            next_cells = ship_grid.get_open_neighbors((row, col)) + [(row, col)]
+            # Fire only grows: waiting cannot make a route safer.
+            next_cells = ship_grid.get_open_neighbors((row, col))
             for next_row, next_col in next_cells:
+                if (next_row, next_col) in blocked_set:
+                    continue
                 next_time = time + 1
-                next_risk = risk[next_time][next_row][next_col]
+                # The button ends the trial before this turn's fire spread.
+                risk_time = time if (next_row, next_col) == goal else next_time
+                next_risk = risk[risk_time][next_row][next_col]
                 # Reject unsafe arrivals before applying the softer risk cost.
-                if next_risk > risk_threshold:
+                if next_risk >= 1.0 or next_risk > risk_threshold:
                     continue
 
                 next_state = (next_row, next_col, next_time)
                 tentative_cost = current_cost + 1.0 + risk_weight * next_risk
                 if tentative_cost >= g_score.get(next_state, float("inf")):
                     continue
+                # With monotone fire risk, an earlier, cheaper arrival can
+                # follow every continuation available to a later arrival.
+                cell = (next_row, next_col)
+                previous_arrivals = arrivals.get(cell, [])
+                if any(t <= next_time and cost <= tentative_cost
+                       for t, cost in previous_arrivals):
+                    continue
+                arrivals[cell] = [
+                    (t, cost) for t, cost in previous_arrivals
+                    if not (next_time <= t and tentative_cost <= cost)
+                ] + [(next_time, tentative_cost)]
 
                 g_score[next_state] = tentative_cost
                 parent[next_state] = current
