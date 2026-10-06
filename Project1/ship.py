@@ -15,6 +15,19 @@ class ShipGrid:
     def __init__(self, D:int):
         self.D = D
         self.grid = self._generate_grid(D)
+        # The layout is fixed; fire is stored separately in FireSystem.
+        self._open_cells = [
+            (int(r), int(c))
+            for r, c in np.argwhere(self.grid == CellState.OPEN)
+        ]
+        self._open_neighbors = {
+            cell: [
+                (cell[0] + dr, cell[1] + dc)
+                for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]
+                if self.is_open(cell[0] + dr, cell[1] + dc)
+            ]
+            for cell in self._open_cells
+        }
         
 
     def _generate_grid(self,D:int)->np.ndarray:
@@ -114,18 +127,12 @@ class ShipGrid:
         return 0 <= r < self.D and 0 <= c < self.D and self.grid[r, c] == CellState.OPEN
     
     def get_open_cells(self):
-        #return [tuple(coord) for coord in np.argwhere(self.grid == CellState.OPEN)]
-        # ruturn plain python ints instead of numpy ints
-        return [(int(r), int(c)) for r, c in np.argwhere(self.grid == CellState.OPEN)]
-    
+        """Return cached cells; callers must not mutate this list."""
+        return self._open_cells
+
     def get_open_neighbors(self, cell: tuple) -> list:
-        r, c = cell
-        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-        return [
-            (r + dr, c + dc)
-            for dr, dc in directions
-            if self.is_open(r + dr, c + dc)
-        ]
+        """Return cached neighbors; callers must not mutate this list."""
+        return self._open_neighbors.get(cell, [])
 
     # check that all open cells are reacheable from every other
     def is_connected(self) -> bool:

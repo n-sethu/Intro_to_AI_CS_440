@@ -77,12 +77,19 @@ class Pathfinder:
             start_state: None
         }
         g_score: dict[tuple[int, int, int], float] = {start_state: 0.0}
+        # Keep tradeoffs: an earlier arrival only dominates if it costs no more.
         arrivals = {start: [(0, 0.0)]}
 
         while open_set:
             _, _, _, current = heappop(open_set)
             current_cost = g_score[current]
             row, col, time = current
+            cell = (row, col)
+            # Skip queued entries superseded by cheaper or earlier arrivals.
+            if (time, current_cost) not in arrivals.get(cell, []):
+                continue
+            if time + heuristic(cell) > horizon:
+                continue
 
             if (row, col) == goal:
                 path = []
@@ -101,33 +108,36 @@ class Pathfinder:
                 if (next_row, next_col) in blocked_set:
                     continue
                 next_time = time + 1
-                # The button ends the trial before this turn's fire spread.
+                next_heuristic = heuristic((next_row, next_col))
+                # Even an obstacle-free route must fit within the forecast.
+                if next_time + next_heuristic > horizon:
+                    continue
+                # Reaching the button ends the trial before fire spreads.
                 risk_time = time if (next_row, next_col) == goal else next_time
                 next_risk = risk[risk_time][next_row][next_col]
                 # Reject unsafe arrivals before applying the softer risk cost.
-                if next_risk >= 1.0 or next_risk > risk_threshold:
+                if (risk[0][next_row][next_col] >= 1.0
+                        or next_risk >= 1.0 or next_risk > risk_threshold):
                     continue
 
                 next_state = (next_row, next_col, next_time)
                 tentative_cost = current_cost + 1.0 + risk_weight * next_risk
                 if tentative_cost >= g_score.get(next_state, float("inf")):
                     continue
-                # With monotone fire risk, an earlier, cheaper arrival can
-                # follow every continuation available to a later arrival.
+
                 cell = (next_row, next_col)
-                previous_arrivals = arrivals.get(cell, [])
-                if any(t <= next_time and cost <= tentative_cost
-                       for t, cost in previous_arrivals):
+                known = arrivals.get(cell, [])
+                if any(t <= next_time and cost <= tentative_cost for t, cost in known):
                     continue
                 arrivals[cell] = [
-                    (t, cost) for t, cost in previous_arrivals
+                    (t, cost) for t, cost in known
                     if not (next_time <= t and tentative_cost <= cost)
-                ] + [(next_time, tentative_cost)]
+                ]
+                arrivals[cell].append((next_time, tentative_cost))
 
                 g_score[next_state] = tentative_cost
                 parent[next_state] = current
                 counter += 1
-                next_heuristic = heuristic((next_row, next_col))
                 priority = tentative_cost + heuristic_weight * next_heuristic
                 heappush(open_set, (priority, next_heuristic, counter, next_state))
 
