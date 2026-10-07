@@ -3,7 +3,7 @@ import random
 from ship import ShipGrid
 from fire import FireSystem
 
-def run_trial(ship, bot_class, start, button, fire_start, q, seed=None, max_steps=100000):
+def run_trial(ship, bot_class, start, button, fire_start, q, seed=None, max_steps=100000, trace=None):
     # trial returns trial success and reason 
     # reasons: 'button', 'walked_into_fire', 'fire_reached_bot', 'timeout'
     # fixed seed ensures the fire's same randomness for each bot
