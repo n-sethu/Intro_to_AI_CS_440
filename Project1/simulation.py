@@ -7,6 +7,7 @@ def run_trial(ship, bot_class, start, button, fire_start, q, seed=None, max_step
     # trial returns trial success and reason 
     # reasons: 'button', 'walked_into_fire', 'fire_reached_bot', 'timeout'
     # fixed seed ensures the fire's same randomness for each bot
+    # trace: optional list; gets the bot position at t=0 and after every move
     rng_state = random.getstate()
     if seed is not None:
         random.seed(seed)
@@ -14,9 +15,13 @@ def run_trial(ship, bot_class, start, button, fire_start, q, seed=None, max_step
         #get fire and bot
         fire = FireSystem(ship, q, fire_start)          
         bot = bot_class(ship, start, button, fire_start)
+        if trace is not None:
+            trace.append(bot.position)
         for _ in range(max_steps):
             # bot makes a move decision
             bot.choose_move(fire)
+            if trace is not None:
+                trace.append(bot.position)
             # if bot is in fire cell, end of trial          
             if bot.position in fire.burning_cells:
                 return False, 'walked_into_fire', bot
@@ -63,4 +68,3 @@ if __name__ == "__main__":
         # Compare all four bot strategies under the same trial seeds.
         wins = compare_bots([Bot1, Bot2, Bot3, Bot4], D=50, q=q, n_trials=n)
         print(f"q={q}: " + ", ".join(f"{k}={v}/{n}" for k, v in wins.items()))
-        

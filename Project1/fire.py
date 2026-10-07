@@ -27,6 +27,7 @@ class FireSystem:
                 newly_lit.add(cell)
         #spread the fire
         self.burning_cells |= newly_lit
+        return newly_lit #lets callers record when each cell ignited
 
     #the set of open cells that are adjacent to a fire cell
     def neighbors_of_fire(self) -> set:

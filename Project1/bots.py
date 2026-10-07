@@ -86,7 +86,15 @@ class Bot4(BaseBot):
         self.path = None
         self.path_index = 0
 
+        # diagnostics for analysis (do not affect decisions)
+        self.plan_count = 0
+        self.relaxed_count = 0      # plans that needed a threshold above risk_threshold
+        self.fallback_count = 0     # plans that fell back to the plain shortest path
+        self.no_path_count = 0      # plans where no fire-free path existed at all
+        self.max_active_threshold = None
+
     def _plan(self, fire):
+        self.plan_count += 1
         self.active_threshold = None
         burning = set(fire.burning_cells)
         shortest_path = Pathfinder.next_move_astar(
@@ -96,6 +104,7 @@ class Bot4(BaseBot):
         self.path_index = 0
         self.steps_since_plan = 0
         if shortest_path is None:
+            self.no_path_count += 1
             return
         # Maze routes can be much longer than their Manhattan distance.
         distance = len(shortest_path) - 1
@@ -118,6 +127,11 @@ class Bot4(BaseBot):
                 blocked_set=burning,
             )
             if path is not None:
+                if threshold > self.risk_threshold:
+                    self.relaxed_count += 1
+                if (self.max_active_threshold is None
+                        or threshold > self.max_active_threshold):
+                    self.max_active_threshold = threshold
                 self.active_threshold = threshold
                 self.path = path
                 self.path_index = 0
@@ -126,6 +140,7 @@ class Bot4(BaseBot):
 
         # If every predicted route exceeds the cutoff, take a currently clear
         # escape route rather than wait for the fire to reach us.
+        self.fallback_count += 1
         self.path = shortest_path
 
     def choose_move(self, fire):
