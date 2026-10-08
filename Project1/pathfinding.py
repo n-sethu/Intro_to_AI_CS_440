@@ -62,6 +62,7 @@ class Pathfinder:
         if start == goal:
             return [start]
 
+        blocked = blocked_set if blocked_set is not None else set()
         horizon = len(risk) - 1
 
         def heuristic(cell):
@@ -105,7 +106,7 @@ class Pathfinder:
             # Fire only grows: waiting cannot make a route safer.
             next_cells = ship_grid.get_open_neighbors((row, col))
             for next_row, next_col in next_cells:
-                if (next_row, next_col) in blocked_set:
+                if (next_row, next_col) in blocked:
                     continue
                 next_time = time + 1
                 next_heuristic = heuristic((next_row, next_col))
