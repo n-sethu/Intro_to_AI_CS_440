@@ -52,7 +52,7 @@ def compare_bots(bot_classes, D, q, n_trials):
 if __name__ == "__main__":
     from bots import Bot1, Bot2, Bot3, Bot4
 
-    n = 20
+    n = 50
     for q in (0.3, 0.5,0.7):
         # Compare all four bot strategies under the same trial seeds.
         wins = compare_bots([Bot1, Bot2, Bot3, Bot4], D=50, q=q, n_trials=n)
