@@ -23,6 +23,7 @@ class Pathfinder:
             risk[0][row][col] = 1.0
 
         open_cells = ship_grid.get_open_cells()
+        neighbors = {cell: ship_grid.get_open_neighbors(cell) for cell in open_cells}
         # Propagate risk using the independent-neighbor ignition approximation.
         for time in range(horizon):
             for row, col in open_cells:
@@ -32,7 +33,7 @@ class Pathfinder:
                     continue
 
                 no_ignition = 1.0
-                for neighbor in ship_grid.get_open_neighbors((row, col)):
+                for neighbor in neighbors[(row, col)]:
                     neighbor_risk = risk[time][neighbor[0]][neighbor[1]]
                     no_ignition *= 1.0 - q * neighbor_risk
 
@@ -54,7 +55,10 @@ class Pathfinder:
         heuristic_weight: float = 1.0,
         blocked_set: set | None = None,
     ):
-        """Search time states; pruning assumes nondecreasing risk and nonnegative costs."""
+        """Find a path through (row, col, time) states using predicted risk."""
+        blocked_set = blocked_set or set()
+        if start in blocked_set or goal in blocked_set:
+            return None
         if start == goal:
             return [start]
 
@@ -99,7 +103,7 @@ class Pathfinder:
             if time >= horizon:
                 continue
 
-            # Risk only increases: waiting adds cost without improving safety.
+            # Fire only grows: waiting cannot make a route safer.
             next_cells = ship_grid.get_open_neighbors((row, col))
             for next_row, next_col in next_cells:
                 if (next_row, next_col) in blocked:
@@ -109,9 +113,12 @@ class Pathfinder:
                 # Even an obstacle-free route must fit within the forecast.
                 if next_time + next_heuristic > horizon:
                     continue
-                next_risk = risk[next_time][next_row][next_col]
+                # Reaching the button ends the trial before fire spreads.
+                risk_time = time if (next_row, next_col) == goal else next_time
+                next_risk = risk[risk_time][next_row][next_col]
                 # Reject unsafe arrivals before applying the softer risk cost.
-                if risk[0][next_row][next_col] >= 1.0 or next_risk > risk_threshold:
+                if (risk[0][next_row][next_col] >= 1.0
+                        or next_risk >= 1.0 or next_risk > risk_threshold):
                     continue
 
                 next_state = (next_row, next_col, next_time)
