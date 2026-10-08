@@ -1,0 +1,5 @@
+q,bot,trials,successes,success_rate,elapsed_seconds,average_seconds,button,walked_into_fire,fire_reached_bot,timeout
+0.80,Bot1,500,295,0.590000,3.195203,0.006390,295,102,103,0
+0.80,Bot2,500,295,0.590000,25.281938,0.050564,295,0,205,0
+0.80,Bot3,500,294,0.588000,41.830146,0.083660,294,0,206,0
+0.80,Bot4,500,296,0.592000,2370.224342,4.740449,296,0,204,0
