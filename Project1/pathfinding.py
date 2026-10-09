@@ -1,19 +1,15 @@
 from collections import deque
 from heapq import heappop, heappush
 # A*, bfs, etc...
-    
 # idea: keep the list of moves in a tuple/list, store each move taken in a separate one,
 # for bot 1 just iterate through list and check if (r,c) is burning at that timestep
 # bot 2 - recalculate from the new startPos each time (checks if each (r,c) is adjacent to a burning cell)
 # bot 3: edit the risk parameter
-# @zahra -> can you do A* or the rest of this file
-
 class Pathfinder:
 
     @staticmethod
     def predict_fire_risk(ship_grid, burning_cells: set, q: float, horizon: int):
-        """Estimate the probability that each open cell is burning at each time."""
-        # Each layer is the predicted fire state at one future timestep.
+        # each layer is the predicted fire state at one future timestep
         risk = [
             [[0.0 for _ in range(ship_grid.D)] for _ in range(ship_grid.D)]
             for _ in range(horizon + 1)
@@ -24,7 +20,7 @@ class Pathfinder:
 
         open_cells = ship_grid.get_open_cells()
         neighbors = {cell: ship_grid.get_open_neighbors(cell) for cell in open_cells}
-        # Propagate risk using the independent-neighbor ignition approximation.
+        # propagate risk using the independent-neighbor ignition approximation
         for time in range(horizon):
             for row, col in open_cells:
                 current_risk = risk[time][row][col]
@@ -55,7 +51,7 @@ class Pathfinder:
         heuristic_weight: float = 1.0,
         blocked_set: set | None = None,
     ):
-        """Find a path through (row, col, time) states using predicted risk."""
+        #find a path through states (row, col, time) using predicted risk
         blocked_set = blocked_set or set()
         if start in blocked_set or goal in blocked_set:
             return None
@@ -68,7 +64,7 @@ class Pathfinder:
         def heuristic(cell):
             return abs(cell[0] - goal[0]) + abs(cell[1] - goal[1])
 
-        # Time is part of the state because the same cell can have different risk later.
+        # time is part of the state because the same cell can have different risk later
         start_state: tuple[int, int, int] = (start[0], start[1], 0)
         counter = 0
         open_set: list[tuple[float, int, int, tuple[int, int, int]]] = [
@@ -78,7 +74,7 @@ class Pathfinder:
             start_state: None
         }
         g_score: dict[tuple[int, int, int], float] = {start_state: 0.0}
-        # Keep tradeoffs: an earlier arrival only dominates if it costs no more.
+        # keep tradeoffs: an earlier arrival only dominates if it costs no more
         arrivals = {start: [(0, 0.0)]}
 
         while open_set:
@@ -86,7 +82,7 @@ class Pathfinder:
             current_cost = g_score[current]
             row, col, time = current
             cell = (row, col)
-            # Skip queued entries superseded by cheaper or earlier arrivals.
+            # skip queued entries superseded by cheaper or earlier arrivals
             if (time, current_cost) not in arrivals.get(cell, []):
                 continue
             if time + heuristic(cell) > horizon:
@@ -103,20 +99,20 @@ class Pathfinder:
             if time >= horizon:
                 continue
 
-            # Fire only grows: waiting cannot make a route safer.
+            # fire only grows: waiting cannot make a route safer
             next_cells = ship_grid.get_open_neighbors((row, col))
             for next_row, next_col in next_cells:
                 if (next_row, next_col) in blocked:
                     continue
                 next_time = time + 1
                 next_heuristic = heuristic((next_row, next_col))
-                # Even an obstacle-free route must fit within the forecast.
+                # even an obstacle-free route must fit within the forecast
                 if next_time + next_heuristic > horizon:
                     continue
-                # Reaching the button ends the trial before fire spreads.
+                # reaching the button ends the trial before fire spreads
                 risk_time = time if (next_row, next_col) == goal else next_time
                 next_risk = risk[risk_time][next_row][next_col]
-                # Reject unsafe arrivals before applying the softer risk cost.
+                # reject unsafe arrivals before applying the softer risk cost
                 if (risk[0][next_row][next_col] >= 1.0
                         or next_risk >= 1.0 or next_risk > risk_threshold):
                     continue

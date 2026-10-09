@@ -1,6 +1,5 @@
 # bot classes
-# @zahra can you make 4 different classes that inherit a base bot classes, lmk if this is too much to finish with the
-# pathfinding algorithms (idt bots 1-3 shld be too much tho)
+# 4 different classes that inherit a base bot classes
 from pathfinding import Pathfinder
 
 class BaseBot: #Base bot that all the other bots inherit
@@ -25,6 +24,7 @@ class Bot1(BaseBot):
     def __init__(self, ship, start, button, initial_fire):
         super().__init__(ship, start, button, initial_fire)
         path = Pathfinder.next_move_astar(ship, start, button, {initial_fire})
+        # switched from bfs to astar
         # path = Pathfinder.next_move_bfs(ship, start, button, {initial_fire})
 
         self.path = path if path is not None else [start]
@@ -41,6 +41,7 @@ class Bot2(BaseBot):
     #Bot2 re plans its path at every step, avoiding all buring cells
     def choose_move(self, fire):
         blocked = set(fire.burning_cells)
+        # switched from bfs to astar
         # path = Pathfinder.next_move_bfs(self.ship, self.position, self.button, blocked)
         path = Pathfinder.next_move_astar(self.ship, self.position, self.button, blocked)
 
@@ -53,9 +54,11 @@ class Bot3(BaseBot):
         burning = set(fire.burning_cells)
         cautious = burning | fire.neighbors_of_fire()
         path = Pathfinder.next_move_astar(self.ship, self.position, self.button, cautious)
+        # switched from bfs to astar
         # path = Pathfinder.next_move_bfs(self.ship, self.position, self.button, cautious)
 
         if path is None:                   #not possible so revert to Bot2 behavior
+            # switched from bfs to astar
             # path = Pathfinder.next_move_bfs(self.ship, self.position, self.button, burning)
             path = Pathfinder.next_move_astar(self.ship, self.position, self.button, burning)
 
@@ -63,8 +66,7 @@ class Bot3(BaseBot):
         return self.position
 
 class Bot4(BaseBot):
-    """Plan through predicted fire risk in space and time."""
-
+    # plan through the predicted fire risk
     def __init__(
         self,
         ship,
@@ -86,7 +88,7 @@ class Bot4(BaseBot):
         self.path = None
         self.path_index = 0
 
-        # diagnostics for analysis (do not affect decisions)
+        # things to track for analysis
         self.plan_count = 0
         self.relaxed_count = 0      # plans that needed a threshold above risk_threshold
         self.fallback_count = 0     # plans that fell back to the plain shortest path
@@ -97,23 +99,18 @@ class Bot4(BaseBot):
         self.plan_count += 1
         self.active_threshold = None
         burning = set(fire.burning_cells)
-        shortest_path = Pathfinder.next_move_astar(
-            self.ship, self.position, self.button, burning
-        )
+        shortest_path = Pathfinder.next_move_astar(self.ship, self.position, self.button, burning)
         self.path = None
         self.path_index = 0
         self.steps_since_plan = 0
         if shortest_path is None:
             self.no_path_count += 1
             return
-        # Maze routes can be much longer than their Manhattan distance.
+        # maze routes longer than their Manhattan distance
         distance = len(shortest_path) - 1
         horizon = max(distance + 10, 2 * distance)
-        risk = Pathfinder.predict_fire_risk(
-            self.ship, fire.burning_cells, fire.q, horizon
-        )
-
-        # Relax the hard cutoff only when the preferred safety bound has no path.
+        risk = Pathfinder.predict_fire_risk(self.ship, fire.burning_cells, fire.q, horizon)
+        # relax the hard cutoff only when the preferred safety bound has no path
         thresholds = sorted({self.risk_threshold, 0.6, 0.8, 0.99})
         for threshold in thresholds:
             path = Pathfinder.next_move_risk_astar(
@@ -137,14 +134,12 @@ class Bot4(BaseBot):
                 self.path_index = 0
                 self.steps_since_plan = 0
                 return
-
-        # If every predicted route exceeds the cutoff, take a currently clear
-        # escape route rather than wait for the fire to reach us.
+        # if every predicted path exceeds the cutoff, take a clear route
         self.fallback_count += 1
         self.path = shortest_path
 
     def choose_move(self, fire):
-        # Replan from the observed fire after each configured batch of moves.
+        # replan using the fire after every batch of moves
         stale_path = self.path is not None and any(
             cell in fire.burning_cells
             for cell in self.path[self.path_index + 1:]

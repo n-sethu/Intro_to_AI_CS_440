@@ -15,7 +15,7 @@ class ShipGrid:
     def __init__(self, D:int):
         self.D = D
         self.grid = self._generate_grid(D)
-        # The layout is fixed; fire is stored separately in FireSystem.
+        # The layout is fixed - fire is stored separately in FireSystem
         self._open_cells = [
             (int(r), int(c))
             for r, c in np.argwhere(self.grid == CellState.OPEN)
@@ -27,8 +27,7 @@ class ShipGrid:
                 if self.is_open(cell[0] + dr, cell[1] + dc)
             ]
             for cell in self._open_cells
-        }
-        
+        }    
 
     def _generate_grid(self,D:int)->np.ndarray:
         # small size(1 byte) of each cell so we can use larger D
@@ -46,7 +45,6 @@ class ShipGrid:
             
             layout[r, c] = CellState.OPEN
             L, coords = self._get_L(layout)
-        
         
         # Dead end step
         F, F_coords = self._get_F(layout)
@@ -80,17 +78,12 @@ class ShipGrid:
             
         return layout
             
-            
-        
-        
-
     # Let L be the number of currently blocked cells that have exactly one open neighbor.
     def _get_L(self, layout:np.ndarray):
         blocked = (layout==CellState.BLOCKED)
         open = (layout==CellState.OPEN)
         
         open_neighbors = np.zeros_like(layout, dtype=np.int8)
-
         
         open_neighbors[:-1, :] += open[1:, :]   # Look Down
         open_neighbors[1:, :]  += open[:-1, :]   # Look Up
@@ -127,11 +120,11 @@ class ShipGrid:
         return 0 <= r < self.D and 0 <= c < self.D and self.grid[r, c] == CellState.OPEN
     
     def get_open_cells(self):
-        """Return cached cells; callers must not mutate this list."""
+        # ruturn cached cells 
         return self._open_cells
 
     def get_open_neighbors(self, cell: tuple) -> list:
-        """Return cached neighbors; callers must not mutate this list."""
+        # return cached neighbors 
         return self._open_neighbors.get(cell, [])
 
     # check that all open cells are reacheable from every other

@@ -1,4 +1,4 @@
-# engine to run the experiments
+# engine to run the simulations
 import random
 from ship import ShipGrid
 from fire import FireSystem
@@ -7,7 +7,7 @@ def run_trial(ship, bot_class, start, button, fire_start, q, seed=None, max_step
     # trial returns trial success and reason 
     # reasons: 'button', 'walked_into_fire', 'fire_reached_bot', 'timeout'
     # fixed seed ensures the fire's same randomness for each bot
-    # trace: optional list; gets the bot position at t=0 and after every move
+    # trace: optional list - gets the bot position at t=0 and after every move
     rng_state = random.getstate()
     if seed is not None:
         random.seed(seed)

@@ -1,10 +1,9 @@
-"""Regression checks for Bot 4's fire avoidance and simulation timing."""
+# regression check for bot 4's fire avoidance and simulation timing
 import unittest
 
 from bots import Bot4
 from fire import FireSystem
 from pathfinding import Pathfinder
-
 
 class SmallGrid:
     def __init__(self, size, cells):
@@ -19,7 +18,6 @@ class SmallGrid:
         return [(row + dr, col + dc)
                 for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1))
                 if (row + dr, col + dc) in self.cells]
-
 
 class Bot4Tests(unittest.TestCase):
     def test_relaxed_threshold_never_crosses_existing_fire(self):
@@ -59,7 +57,6 @@ class Bot4Tests(unittest.TestCase):
         bot._plan(fire)
         self.assertEqual(len(bot.path), 23)
         self.assertTrue(all(cell not in fire.burning_cells for cell in bot.path))
-
 
 if __name__ == "__main__":
     unittest.main()

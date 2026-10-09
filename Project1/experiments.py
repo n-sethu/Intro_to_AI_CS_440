@@ -1,5 +1,5 @@
-"""Run reproducible Bot 1-4 experiments across a fire-spread sweep."""
 
+# run reproducible experiments on bots 1-4 to compare their behaviors
 # csv for summary of trials
 # trials-csv for detailed comparisons 
 
@@ -51,18 +51,17 @@ class Scenario:
 	fire_seed: int
 	layout_seed: int
 	features: dict      # q-independent geometry, computed once
-	bot1_path: list     # Bot 1's fixed plan (None if no path avoiding the fire start)
-	fire_dist: dict     # static BFS distance from the fire start (earliest possible ignition)
+	bot1_path: list     # bot 1's fixed plan, none if there is no path
+	fire_dist: dict     # static BFS distance from the fire start 
 	button_dist: dict   # static BFS distance from the button
 
 @dataclass
 class Timeline:
-	"""Exact fire progression for one (scenario, q); identical for every bot
-	because no bot consumes randomness."""
-	ignition: dict          # cell -> step at which it ignites (fire start = 0)
+	# fire progression that is the same for each bot in each scenario
+	ignition: dict          # step at which cell ignites, fire start = 0
 	button_time: float      # step at which the button ignites
 	sorted_times: list      # sorted ignition times, for burning-cell counts
-	complete_until: int     # ignition info is exact for steps <= this
+	complete_until: int     # ignition info is exact for steps
 
 def bfs_distances(ship, source):
 	dist = {source: 0}
@@ -75,22 +74,15 @@ def bfs_distances(ship, source):
 				queue.append(nb)
 	return dist
  
- 
 def manhattan(a, b):
 	return abs(a[0] - b[0]) + abs(a[1] - b[1])
- 
  
 def cell_str(cell):
 	return f"{cell[0]}-{cell[1]}"
 
 def safe_route_length(ship, start, button, ignition):
-	"""Length of the shortest route that never stands in a burning cell, given
-	the cell ignition times (or None if no such route exists).
- 
-	Arriving at a cell on move t is safe if it ignites after step t (the button
-	only needs to be unburnt when we step on it, i.e. after step t-1). Earlier
-	arrival is never worse, so a plain BFS finds the best route; waiting never helps.
-	"""
+	# length of shortest path that doesn't stand in a burning cell
+	# at time t it is safe as long as cell ignites after time t
 	if start == button:
 		return 0
 	seen = {start}
@@ -114,7 +106,7 @@ def safe_route_length(ship, start, button, ignition):
 	return None
 
 def path_survives(path, ignition):
-	"""True if a fixed path (path[0] = start) is never caught by the fire."""
+	# true if a path doesn't catch on fire
 	if path is None or len(path) < 2:
 		return False
 	last = len(path) - 1
@@ -135,9 +127,8 @@ def scenario_features(ship, start, button, fire_start):
 	start_button = start_dist[button]
 	fire_button = fire_dist[button]
 	fire_start_dist = fire_dist[start]
-	# Fire can only move 1 cell/step, so a route whose cells are all strictly
-	# farther from the fire (by step count) than from the bot cannot be caught,
-	# no matter how the randomness falls.
+	# fire can only move 1 cell 
+	# a route whose cells are all farther from the fire than from the bot cannot be caught
 	guaranteed = safe_route_length(ship, start, button, fire_dist)
 
 	features = {
@@ -166,7 +157,7 @@ def scenario_features(ship, start, button, fire_start):
 	return features, bot1_path, fire_dist, button_dist
 
 def build_scenarios(D, n_trials, seed):
-	"""Create fixed ship/start/fire scenarios so bots receive fair comparisons."""
+	# create a scenario for the bots
 	rng = random.Random(seed)
 	scenarios = []
 
@@ -194,9 +185,7 @@ def build_scenarios(D, n_trials, seed):
 	return scenarios
 
 def compute_timeline(scenario, q, max_steps):
-	"""Replay the fire alone (same seed as the bot trials) and record when each
-	cell ignites. Stops once the button ignites: no bot can win after that, so
-	nothing later affects the oracle."""
+	# run the fire just to track when each cell ignites
 	state = random.getstate()
 	random.seed(scenario.fire_seed)
 	try:
@@ -215,13 +204,13 @@ def compute_timeline(scenario, q, max_steps):
 	return Timeline(ignition, button_time, sorted(ignition.values()), t)
 
 def burning_count(timeline, step):
-	"""Cells burning after `step` fire steps (None if beyond what was simulated)."""
+	# cells that are burning after a step
 	if step > timeline.complete_until:
 		return None
 	return bisect_right(timeline.sorted_times, step)
 
 def first_divergence(trace_a, trace_b):
-	"""First timestep at which two bots stood in different cells (-1 = never)."""
+	# track when two bots diverge paths
 	for t, (a, b) in enumerate(zip(trace_a, trace_b)):
 		if a != b:
 			return t
@@ -230,9 +219,10 @@ def first_divergence(trace_a, trace_b):
 def trajectory_metrics(trace, timeline, scenario):
 	steps = len(trace) - 1
 	moves = sum(1 for a, b in zip(trace, trace[1:]) if a != b)
-	# Smallest (ignition step - current step) along the way. 0 or below means
-	# the fire got there first; small positive = a close call. Cells that never
-	# ignited within the simulated window count as button_time + 1 (lower bound).
+	# smallest along the way
+	# 0 or below - fire got there
+	# small positive - a close call
+	# cells that never ignited - button_time + 1 
 	cap = timeline.button_time + 1 if timeline.button_time != INF else timeline.complete_until + 1
 	min_slack = min(timeline.ignition.get(cell, cap) - t for t, cell in enumerate(trace))
 	final_to_button = scenario.button_dist.get(trace[-1], "")
@@ -351,7 +341,8 @@ def run_sweep(
 	csv_path=None,
 	trials_csv_path=None,
 ):
-	"""Run every bot on the same scenarios and return timed result records."""
+	# run every bot on the same scenarios
+	# return the times results
 	scenarios = build_scenarios(D, n_trials, seed)
 	bot_names = [b.__name__ for b in bot_classes]
 	results = []
@@ -400,7 +391,7 @@ def run_sweep(
 						raise RuntimeError(
 							f"{name} returned inconsistent trial result"
 						)
-					# Bot 1 follows a fixed path, so the timeline predicts its result exactly.
+					# bot 1 follows a fixed path, timeline predicts its result exactly
 					if name == "Bot1" and success != path_survives(sc.bot1_path, tl.ignition):
 						bot1_mismatches += 1
  
@@ -410,8 +401,8 @@ def run_sweep(
 						**trajectory_metrics(trace, tl, sc),
 						"trial_seconds": f"{trial_seconds:.6f}",
 					}
-					# Fire burns during steps 1..T; the bot is checked before fire.step on
-					# 'button'/'walked_into_fire' and after it otherwise.
+					# bot checked before fire step for botton or walked into fire
+					# bot checked after otherwise
 					steps = fields["steps"]
 					checked_after_fire = reason in ("fire_reached_bot", "timeout")
 					count = burning_count(tl, steps if checked_after_fire else steps - 1)
@@ -473,7 +464,7 @@ def print_result(result):
 
 
 def write_results_csv(results, csv_path):
-	"""Write one row per bot/q pair for plotting or statistical analysis."""
+	# one row per bot/q pair
 	fieldnames = [
 		"q",
 		"bot",
