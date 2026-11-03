@@ -18,8 +18,6 @@ class LocatorBot:
         self.position = tuple(start)
         self._lost_bot = tuple(lostBot)
         self.open_cells = {tuple(cell) for cell in ship.get_open_cells()}
-        if self.position not in self.open_cells or self._lost_bot not in self.open_cells:
-            raise ValueError("Both bots must start on open cells.")
         self.found = False
         self.move_actions = 0
         self.detector_actions = 0
@@ -44,11 +42,7 @@ class LocatorBot:
 
     def move(self, destination):
         # takes step and adds to action counter
-        if self.found:
-            raise RuntimeError("The search has already finished.")
         destination = tuple(destination)
-        if destination not in self.ship.get_open_neighbors(self.position):
-            raise ValueError("Destination must be an open neighbor of the current cell.")
         self.position = destination
         self.move_actions += 1
         return self.position
@@ -91,8 +85,6 @@ class BaselineTypeABot(LocatorBot):
 # pass rng seed so they work on the same ship
     def __init__(self, ship, start, lostBot, k, rng=None):
         super().__init__(ship, start, lostBot)
-        if isinstance(k, bool) or not isinstance(k, int) or k < 0:
-            raise ValueError("k must be a nonnegative integer.")
         self.k = k
         self.rng = rng if rng is not None else random.Random()
         self.cells = np.array(sorted(self.open_cells), dtype=int)
@@ -125,14 +117,12 @@ class BaselineTypeABot(LocatorBot):
         if result is DetectorResult.FOUND:
             self.possible_mask.fill(False)
             self.possible_mask[current] = True
-        elif result in (DetectorResult.PING, DetectorResult.NO_PING):
+        else:
             in_range = self._in_range(self.cells)
             self.possible_mask &= (
                 in_range if result is DetectorResult.PING else ~in_range
             )
             self.possible_mask[current] = False
-        else:
-            raise ValueError("Unknown detector result.")
 
     def _nearest_path(self, candidates=None):
         return super()._nearest_path(
@@ -157,7 +147,7 @@ class BaselineTypeBBot(LocatorBot):
 # again pass rng in for the same ship
     def __init__(self, ship, start, lostBot, alpha, rng=None):
         super().__init__(ship, start, lostBot)
-      
+
         self.alpha = float(alpha)
         self.rng = rng if rng is not None else random.Random()
         self.cells = np.array(sorted(self.open_cells), dtype=int)
@@ -187,8 +177,6 @@ class BaselineTypeBBot(LocatorBot):
             self.log_belief.fill(-np.inf)
             self.log_belief[current] = 0.0
             return
-        if result not in (DetectorResult.PING, DetectorResult.NO_PING):
-            raise ValueError("Unknown detector result.")
         log_ping = self._log_ping_probabilities()
         if result is DetectorResult.PING:
             likelihood = log_ping
