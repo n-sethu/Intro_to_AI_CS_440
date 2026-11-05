@@ -212,6 +212,7 @@ class BaselineTypeBBot(LocatorBot):
         return False
 
 
+
 # improved type A : scan for where info gained per unit of effort is highest
 # as opposed to moving to nearest possible cell
 # gain -> expected candidates eliminated
@@ -293,3 +294,11 @@ class ImprovedTypeABot(BaselineTypeABot):
 # difference is that move_weight is 0
 class ImprovedTypeAFreeBot(ImprovedTypeABot):
     move_weight = 0.0
+    
+    
+    
+    
+# free movement bots
+# idea for type A - each detector action should split the search space in half (binary search type) so find the most optimal position in the area the bot could be which gets the most information and go there
+# for type b - use a recursive bayesian update rule and go to the place that maximizes information (centroids not just highest probability)
+

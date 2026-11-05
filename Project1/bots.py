@@ -75,9 +75,22 @@ class Bot4(BaseBot):
         initial_fire,
         replanning_interval=1,
         risk_threshold=0.4,
-        risk_weight=5.0,
+        risk_weight=2.0,
         heuristic_weight=1.0,
     ):
+        # Notes: 
+        # Default: Risk weight 5.0: 
+        # q=0.3: Bot1=83/100, Bot2=84/100, Bot3=85/100, Bot4=87/100, 
+        # q=0.5: Bot1=71/100, Bot2=76/100, Bot3=74/100, Bot4=76/100, 
+        # q=0.7: Bot1=63/100, Bot2=63/100, Bot3=61/100, Bot4=63/100
+        # Trying risk weight of 10.0 
+        #   q=0.3: Bot1=84/100, Bot2=88/100, Bot3=91/100, Bot4=89/100
+        #   q=0.5: Bot1=66/100, Bot2=67/100, Bot3=67/100, Bot4=68/100
+        #   q=0.7: Bot1=72/100, Bot2=72/100, Bot3=72/100, Bot4=72/100
+        #Risk Weight 2.0:
+        #   q=0.3: Bot1=87/100, Bot2=90/100, Bot3=90/100, Bot4=91/100
+        #   q=0.5: Bot1=81/100, Bot2=81/100, Bot3=81/100, Bot4=81/100
+        #   q=0.7: Bot1=60/100, Bot2=60/100, Bot3=60/100, Bot4=60/100
         super().__init__(ship, start, button, initial_fire)
         self.replanning_interval = max(1, replanning_interval)
         self.risk_threshold = risk_threshold
