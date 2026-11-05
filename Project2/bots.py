@@ -210,3 +210,86 @@ class BaselineTypeBBot(LocatorBot):
         for cell in self._most_likely_path()[1:]:
             self.move(cell)
         return False
+
+
+# improved type A : scan for where info gained per unit of effort is highest
+# as opposed to moving to nearest possible cell
+# gain -> expected candidates eliminated
+# cost -> distance to c + scan
+# move_weight for free movement case later on
+class ImprovedTypeABot(BaselineTypeABot):
+    move_weight = 1.0
+ 
+    def __init__(self, ship, start, lostBot, k, rng=None, move_weight=None):
+        super().__init__(ship, start, lostBot, k, rng=rng)
+        if move_weight is not None:
+            self.move_weight = move_weight
+ 
+    # gain -> how much does a scan at each cell shrink the candidate set
+    # for each open cell : how many candidates are in its window? 
+    def _window_counts(self):
+        D = self.ship.D
+        rows, cols = self.cells[:, 0], self.cells[:, 1]
+        occupancy = np.zeros((D, D), dtype=np.int64)
+        occupancy[rows, cols] = self.possible_mask
+        integral = np.zeros((D + 1, D + 1), dtype=np.int64)
+        integral[1:, 1:] = occupancy.cumsum(axis=0).cumsum(axis=1)
+        r0 = np.clip(rows - self.k, 0, D)
+        r1 = np.clip(rows + self.k + 1, 0, D)
+        c0 = np.clip(cols - self.k, 0, D)
+        c1 = np.clip(cols + self.k + 1, 0, D)
+        return integral[r1, c1] - integral[r0, c1] - integral[r1, c0] + integral[r0, c0]
+ 
+    def _expected_gain(self):
+        n = int(self.possible_mask.sum())
+        n_in = self._window_counts()          # candidates inside the window
+        n_out = n - n_in                      # candidates outside it
+        own = self.possible_mask.astype(np.int64)  # standing on a candidate can FIND it
+        # PING leaves (n_in - own) candidates, NO_PING leaves n_out, FOUND leaves 0.
+        # Chances are n_in/n and n_out/n, so:  E[remaining] = numerator / n
+        numerator = (n_in - own) ** 2 + n_out ** 2
+        return n - numerator / n
+ 
+    # cost -> walking distance from the current position to every cell
+    def _bfs_all(self):
+        dist = np.full(len(self.cells), np.inf)
+        parent = {self.position: None}
+        dist[self._cell_index[self.position]] = 0
+        queue = deque([self.position])
+        while queue:
+            cell = queue.popleft()
+            for neighbor in self.ship.get_open_neighbors(cell):
+                if neighbor not in parent:
+                    parent[neighbor] = cell
+                    dist[self._cell_index[neighbor]] = dist[self._cell_index[cell]] + 1
+                    queue.append(neighbor)
+        return dist, parent
+ 
+    def _choose_target(self):
+        gain = self._expected_gain()
+        dist, parent = self._bfs_all()
+        score = gain / (self.move_weight * dist + 0.5)   # inf distance -> score 0
+        best_score = score.max()
+        best = np.flatnonzero(np.isclose(score, best_score, rtol=1e-12, atol=0.0))
+        # tie-break: nearest first, then at random
+        nearest = best[dist[best] == dist[best].min()]
+        target = tuple(self.cells[self.rng.choice(nearest.tolist())])
+        path = []
+        while target is not None:
+            path.append(target)
+            target = parent[target]
+        return list(reversed(path))
+ 
+    def step(self):
+        if self.found:
+            return True
+        for cell in self._choose_target()[1:]:
+            self.move(cell)
+        self.update_knowledge(self.ping())
+        return self.found
+
+ 
+# same strategy as improved type A
+# difference is that move_weight is 0
+class ImprovedTypeAFreeBot(ImprovedTypeABot):
+    move_weight = 0.0

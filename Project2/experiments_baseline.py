@@ -16,7 +16,9 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from Project1.ship import ShipGrid
-from Project2.bots import BaselineTypeABot, BaselineTypeBBot
+from Project2.bots import ( 
+    BaselineTypeABot, BaselineTypeBBot, ImprovedTypeABot, ImprovedTypeAFreeBot
+)
 
 
 DEFAULT_D = 75
@@ -286,6 +288,28 @@ def run_sweep(D=DEFAULT_D, n_trials=DEFAULT_TRIALS, seed=440,
     return rows, results
 
 
+def run_improved_a_sweep(D=DEFAULT_D, n_trials=DEFAULT_TRIALS, seed=440,
+                         k_values=None, free=False, output_dir=DEFAULT_OUTPUT_DIR):
+    """Improved Type A on the SAME scenarios (same seed) as the baseline sweep.
+    free=True uses the free-movement variant (Q6)."""
+    ks = default_k_values(D) if k_values is None else tuple(dict.fromkeys(k_values))
+    scenarios = build_scenarios(D, n_trials, seed)
+    bot_class = ImprovedTypeAFreeBot if free else ImprovedTypeABot
+    tag = "free_a" if free else "improved_a"
+    rows = []
+    for k in ks:
+        rows.extend(_run_trials(scenarios, "A", [k], n_trials, seed,
+                                bot_classes=(bot_class, BaselineTypeBBot)))
+        results = summarize_trials(rows)
+        write_trials_csv(rows, Path(output_dir) / f"{tag}_trials.csv")
+        write_summary_csv(results, Path(output_dir) / f"{tag}_summary.csv")
+        latest = results[-1]
+        print(f"  successes={latest['successes']}/{latest['trials']}; "
+              f"mean cost={latest['discovery_cost_mean']}; "
+              f"mean free-movement cost={latest['free_movement_cost_mean']}", flush=True)
+    return rows, results
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--grid-size", type=int, default=DEFAULT_D)
@@ -301,6 +325,12 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
+    
+    if args.strategy == "improved":
+        run_improved_a_sweep(D=args.grid_size, n_trials=args.trials, seed=args.seed,
+                             k_values=args.k, free=args.free, output_dir=args.output_dir)
+        sys.exit(0)
+
     run_sweep(D=args.grid_size, n_trials=args.trials, seed=args.seed,
               k_values=args.k, alpha_values=args.alpha,
               detector=args.detector, output_dir=args.output_dir)
