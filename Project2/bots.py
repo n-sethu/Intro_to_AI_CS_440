@@ -290,14 +290,7 @@ class ImprovedTypeABot(BaselineTypeABot):
         return self.found
 
  
-# same strategy as improved type A
-# difference is that move_weight is 0
-class ImprovedTypeAFreeBot(ImprovedTypeABot):
-    move_weight = 0.0
-    
-    
-    
-    
+
 # free movement bots
 # idea for type A - each detector action should split the search space in half (binary search type) so find the most optimal position in the area the bot could be which gets the most information and go there
 # for type b - use a recursive bayesian update rule and go to the place that maximizes information (centroids not just highest probability)
@@ -829,3 +822,166 @@ class ImprovedTypeBBot(BaselineTypeBBot):
 
         self.update_knowledge(self.ping())
         return self.found
+
+
+class FreeTypeABot(BaselineTypeABot):
+    """Free-movement Type A: information-maximizing (binary-search style) scans.
+ 
+    Every open cell is a possible scan spot.  A scan from cell c has three
+    outcomes over the n remaining candidates:
+        FOUND    (c itself is a candidate)           -> own cells
+        PING     (other candidates inside c's window) -> n_in - own cells
+        NO_PING  (candidates outside the window)      -> n - n_in cells
+    Since the posterior stays uniform on whatever survives, the expected
+    information gain is exactly the Shannon entropy of that 3-way split, so we
+    scan from the cell whose split is the most even.  With lookahead=True we also
+    add the best entropy obtainable on the NEXT scan for the top `beam` first
+    scans (a 2-step search), which avoids greedy choices that leave awkward,
+    badly-shaped leftovers.
+    """
+    tiebreak = "nearest"  # "nearest", "packed", "corner" or "random"
+ 
+    def __init__(self, ship, start, lostBot, k, rng=None,
+                 lookahead=False, beam=12, tiebreak=None):
+        super().__init__(ship, start, lostBot, k, rng=rng)
+        self.lookahead = lookahead
+        self.beam = beam
+        if tiebreak is not None:
+            self.tiebreak = tiebreak
+        self._rows, self._cols = self.cells[:, 0], self.cells[:, 1]
+ 
+    # number of candidate cells inside every cell's window, via 2D prefix sums
+    def _counts(self, mask, radius=None):
+        k = self.k if radius is None else radius
+        D = self.ship.D
+        occ = np.zeros((D, D), dtype=np.int64)
+        occ[self._rows, self._cols] = mask
+        integ = np.zeros((D + 1, D + 1), dtype=np.int64)
+        integ[1:, 1:] = occ.cumsum(axis=0).cumsum(axis=1)
+        r0 = np.clip(self._rows - k, 0, D); r1 = np.clip(self._rows + k + 1, 0, D)
+        c0 = np.clip(self._cols - k, 0, D); c1 = np.clip(self._cols + k + 1, 0, D)
+        return integ[r1, c1] - integ[r0, c1] - integ[r1, c0] + integ[r0, c0]
+ 
+    @staticmethod
+    def _entropy(*parts, n):
+        h = np.zeros(len(parts[0]))
+        for x in parts:
+            frac = x / n
+            with np.errstate(divide="ignore", invalid="ignore"):
+                h -= np.where(x > 0, frac * np.log2(frac), 0.0)
+        return h
+ 
+    def _gain(self, mask):
+        n = int(mask.sum())
+        n_in = self._counts(mask)
+        own = mask.astype(np.int64)
+        return self._entropy(own, n_in - own, n - n_in, n=n) + 1e-6 * own, n_in, own, n
+ 
+    def _choose_cell(self):
+        gain, n_in, own, n = self._gain(self.possible_mask)
+        if self.lookahead and n > 2:
+            top = np.argsort(-gain)[: self.beam]
+            total = gain.copy()
+            for c in top:
+                win = np.all(np.abs(self.cells - self.cells[c]) <= self.k, axis=1)
+                ping_mask = self.possible_mask & win
+                ping_mask[c] = False
+                no_mask = self.possible_mask & ~win
+                nxt = 0.0
+                for m in (ping_mask, no_mask):
+                    size = int(m.sum())
+                    if size:
+                        nxt += size / n * self._gain(m)[0].max()
+                total[c] = gain[c] + nxt
+            gain = np.where(np.isin(np.arange(len(gain)), top), total, -np.inf)
+        best = gain.max()
+        tied = np.flatnonzero(np.isclose(gain, best, rtol=0, atol=1e-10))
+        if self.tiebreak == "corner":
+            return int(tied[0])                      # cells are sorted row-major
+        if self.tiebreak == "nearest" and len(tied) > 1:
+            # Walking is free, but a sweep that continues next to the area just
+            # covered keeps the eliminated region contiguous (no wasted slivers).
+            dist = ImprovedTypeABot._bfs_all(self)[0][tied]
+            tied = tied[dist == dist.min()]
+        if self.tiebreak == "packed" and len(tied) > 1:
+            # Among equally informative scans, prefer the window hugging
+            # already-eliminated cells: fewest candidates in the 1-cell ring
+            # around it.  This tiles the ship instead of leaving slivers.
+            ring = (self._counts(self.possible_mask, self.k + 1)
+                    - self._counts(self.possible_mask))[tied]
+            tied = tied[ring == ring.min()]
+        return int(self.rng.choice(tied.tolist()))
+ 
+    def step(self):
+        if self.found:
+            return True
+        target = tuple(self.cells[self._choose_cell()])
+        if target != self.position:
+            for cell in self._nearest_path({target})[1:]:
+                self.move(cell)               # walking is free in Q6 scoring
+        self.update_knowledge(self.ping())
+        return self.found
+
+
+class FreeTypeBBot(BaselineTypeBBot):
+    """Free-movement Type B: scan where the reading is most informative.
+ 
+    Belief update is the same Bayes rule as the baseline.  The decision is
+    different: instead of walking to the single most likely cell (which is
+    only sensible when walking is what costs you), we pick the scan cell c that
+    maximizes the mutual information between the scan outcome and LostBot's
+    location:  I(c) = H(outcome) - E_target[ H(outcome | target) ].
+    Outcome distribution at c:  FOUND w.p. p_c; PING w.p. sum_{t!=c} p_t P(c,t);
+    NO_PING otherwise.  Given the target the outcome is a coin flip with
+    P(c,t)=exp(-alpha(d-1)) (or certain, if t == c).
+    Endgame: once the most likely cell holds >= `endgame` of the probability
+    mass we just stand on it, because a FOUND ends the search outright.
+    The (n x n) ping table is built once per bot, so each decision is a pair of
+    matrix-vector products.
+    """
+ 
+    def __init__(self, ship, start, lostBot, alpha, rng=None, endgame=0.5):
+        super().__init__(ship, start, lostBot, alpha, rng=rng)
+        self.endgame = endgame
+        n = len(self.cells)
+        P = np.empty((n, n))
+        for first in range(0, n, 256):
+            block = self.cells[first:first + 256, None, :] - self.cells[None, :, :]
+            d = np.sqrt((block ** 2).sum(axis=2))
+            P[first:first + 256] = np.exp(-self.alpha * np.maximum(d - 1.0, 0.0))
+        logP = np.log(P)                       # = -alpha*max(d-1,0)
+        Q = -np.expm1(logP)                    # 1 - P, accurate near P = 1
+        with np.errstate(divide="ignore", invalid="ignore"):
+            T = P * logP + np.where(Q > 0, Q * np.log(Q), 0.0)   # = -h(P)
+        self._P, self._T = P, T
+ 
+    def _information_gain(self):
+        p = self.probabilities
+        p = p / p.sum()
+        q_ping = np.clip(self._P @ p - p, 0.0, 1.0)      # remove the c == t term
+        q_no = np.clip(1.0 - p - q_ping, 0.0, 1.0)
+        out = np.stack((p, q_ping, q_no), axis=1)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            h_obs = -np.where(out > 0, out * np.log(out), 0.0).sum(axis=1)
+        return h_obs + self._T @ p, p
+ 
+    def _choose_cell(self):
+        gain, p = self._information_gain()
+        if p.max() >= self.endgame:
+            score = p
+        else:
+            score = gain + 1e-12 * p
+        best = score.max()
+        tied = np.flatnonzero(np.isclose(score, best, rtol=0, atol=1e-12))
+        return int(self.rng.choice(tied.tolist()))
+ 
+    def step(self):
+        if self.found:
+            return True
+        target = tuple(self.cells[self._choose_cell()])
+        if target != self.position:
+            for cell in self._nearest_path({target})[1:]:
+                self.move(cell)
+        self.update_knowledge(self.ping())
+        return self.found
+
