@@ -3,3 +3,4 @@ Project1/.vscode
 Project1/__pycache__
 *.out
 *.err
+Project2/__pycache__

@@ -8,6 +8,7 @@ from pathlib import Path
 import random
 import sys
 from time import perf_counter
+from threading import Event, Thread
 
 import numpy as np
 
@@ -75,18 +76,32 @@ def _path_distance(ship, start, goal):
     raise ValueError("LostBot is unreachable from the starting cell.")
 
 
-def _run_trials(scenarios, detector, values, n_trials, seed):
+def _run_trials(scenarios, detector, values, n_trials, seed, bot_class=None,
+                progress_interval=None):
     rows = []
     for value in values:
         print(f"Type {detector}: {'k' if detector == 'A' else 'alpha'}={value}", flush=True)
         for index, scenario in enumerate(scenarios[:n_trials], start=1):
             # Same bot seed per scenario across parameter settings; never use
             # global random state for detector draws or random path tie breaks.
-            bot_class = BaselineTypeABot if detector == "A" else BaselineTypeBBot
-            bot = bot_class(scenario.ship, scenario.start, scenario.lost_bot,
+            trial_bot_class = bot_class or (BaselineTypeABot if detector == "A" else BaselineTypeBBot)
+            if progress_interval:
+                print(f"  Trial {index}/{n_trials}: initializing bot...", flush=True)
+            bot = trial_bot_class(scenario.ship, scenario.start, scenario.lost_bot,
                             value, rng=random.Random(scenario.bot_seed))
             started = perf_counter()
             status, error = "round_limit", ""
+            stop_progress = Event()
+            if progress_interval:
+                def report_progress():
+                    while not stop_progress.wait(progress_interval):
+                        print(f"  Trial {index}/{n_trials}: "
+                              f"{perf_counter() - started:.1f}s elapsed; "
+                              f"moves={bot.move_actions}, scans={bot.detector_actions}; "
+                              "running/planning...", flush=True)
+
+                progress_thread = Thread(target=report_progress, daemon=True)
+                progress_thread.start()
             try:
                 # Every unsuccessful scan rules out at least its current cell.
                 for _ in range(len(bot.open_cells) + 1):
@@ -95,7 +110,14 @@ def _run_trials(scenarios, detector, values, n_trials, seed):
                         break
             except RuntimeError as exc:
                 status, error = "error", str(exc)
+            finally:
+                stop_progress.set()
+                if progress_interval:
+                    progress_thread.join()
             elapsed = perf_counter() - started
+            if progress_interval:
+                print(f"  Trial {index}/{n_trials}: {status} in {elapsed:.1f}s; "
+                      f"moves={bot.move_actions}, scans={bot.detector_actions}", flush=True)
             row = build_trial_row(
                 bot, scenario.scenario_id, seed,
                 k=value if detector == "A" else None,
