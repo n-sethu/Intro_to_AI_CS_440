@@ -61,7 +61,18 @@ if __name__ == "__main__":
                         help="Planning cost per move; scans cost 0.5 (default: 1). "
                              "CSV costs still use the baseline scoring formula.")
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument("--shard-index", type=int, default=0,
+                        help="Zero-based index of this alpha shard.")
+    parser.add_argument("--num-shards", type=int, default=1,
+                        help="Split alpha values across this many workers.")
     args = parser.parse_args()
+    if args.num_shards < 1 or not 0 <= args.shard_index < args.num_shards:
+        parser.error("require num-shards >= 1 and 0 <= shard-index < num-shards")
+    args.alpha = list(dict.fromkeys(args.alpha))[args.shard_index::args.num_shards]
+    if not args.alpha:
+        print(f"Shard {args.shard_index}: no alpha values assigned", flush=True)
+        sys.exit(0)
+    print(f"Shard {args.shard_index}/{args.num_shards}: alpha={args.alpha}", flush=True)
     run_sweep(D=args.grid_size, n_trials=args.trials, seed=args.seed,
               alpha_values=args.alpha, output_dir=args.output_dir,
               move_weight=args.move_weight)
