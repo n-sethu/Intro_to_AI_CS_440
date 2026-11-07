@@ -10,17 +10,14 @@ from time import perf_counter
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from Project2.bots import (
-    FreeTypeABot, FreeTypeBBot, ImprovedTypeAFreeBot,
-)
+from Project2.bots import FreeTypeABot, FreeTypeBBot
 from Project2.experiments_baseline import (
     DEFAULT_ALPHA_VALUES, DEFAULT_D, DEFAULT_TRIALS, _run_trials, build_scenarios,
     default_k_values, summarize_trials, write_summary_csv, write_trials_csv,
 )
 
 DEFAULT_OUTPUT_DIR = Path(__file__).resolve().parent / "free-results"
-# FreeTypeABot: entropy-based split.  ImprovedTypeAFreeBot: expected-remaining split.
-A_BOTS = {"FreeTypeABot": FreeTypeABot, "ImprovedTypeAFreeBot": ImprovedTypeAFreeBot}
+A_BOTS = {"FreeTypeABot": FreeTypeABot}
 B_BOTS = {"FreeTypeBBot": FreeTypeBBot}
 
 
