@@ -6,3 +6,5 @@ Project1/__pycache__
 Project2/__pycache__
 *.csv
 *.txt
+__pycache__/
+*.pyc
