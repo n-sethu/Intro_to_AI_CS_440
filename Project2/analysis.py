@@ -4,7 +4,6 @@ python analysis.py --combine-only    # refresh combined_trials.csv, stdlib only
 python analysis.py                   # refresh CSV, then analyze (pandas/matplotlib)
 python analysis.py --no-combine      # analyze the existing snapshot
 
-Never mixes summary rows into trial data. Run again after the last shard finishes.
 """
 import argparse
 import csv
