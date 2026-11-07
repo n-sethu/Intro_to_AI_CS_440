@@ -8,3 +8,5 @@ Project2/__pycache__
 *.txt
 __pycache__/
 *.pyc
+
+!Project2/combined_trials.csv

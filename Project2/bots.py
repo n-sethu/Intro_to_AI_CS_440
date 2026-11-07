@@ -296,22 +296,6 @@ class ImprovedTypeABot(BaselineTypeABot):
 # for type b - use a recursive bayesian update rule and go to the place that maximizes information (centroids not just highest probability)
 
 class ImprovedTypeBBot(BaselineTypeBBot):
-    """Batched one-step rollout with adaptive allocation of simulations.
-
-    Defaults:
-        initial_rollouts=8
-        max_rollouts=64
-        finalists=4
-        max_candidates=32
-        batch_size=16
-
-    max_candidates=None considers every open cell.
-    move_weight=0.0 handles the free-movement experiment.
-
-    Finite simulations, shortlisting, and adaptive elimination do not guarantee
-    improvement over baseline on every trial.
-    """
-
     _geometry_cache = None
 
     def __init__(
@@ -451,7 +435,7 @@ class ImprovedTypeBBot(BaselineTypeBBot):
         return cache[origin]
 
     def _sensor_logs(self, origin):
-        """Log likelihoods; the sensing cell belongs to FOUND."""
+        # Log likelihoods; the sensing cell belongs to FOUND.
         cache = self._sensor_cache
 
         if origin not in cache:
@@ -477,7 +461,7 @@ class ImprovedTypeBBot(BaselineTypeBBot):
 
     @staticmethod
     def _normalize_rows(weights):
-        """Stable log-space normalization of a batch of beliefs."""
+        # Stable log-space normalization of a batch of beliefs.
         maximum = np.max(weights, axis=1, keepdims=True)
 
         if not np.isfinite(maximum).all():
@@ -595,11 +579,10 @@ class ImprovedTypeBBot(BaselineTypeBBot):
         return np.array(sorted(selected), dtype=int)
 
     def _simulate_batch(self, current, action, targets):
-        """Simulate one candidate action followed by baseline B.
+        # Simulate one candidate action followed by baseline B.
 
-        Each row has its own target, sampled from the current belief.
-        This method never accesses self._lost_bot.
-        """
+        # Each row has its own target, sampled from the current belief.
+        
         size = len(targets)
         n = len(self.cells)
 
@@ -825,20 +808,20 @@ class ImprovedTypeBBot(BaselineTypeBBot):
 
 
 class FreeTypeABot(BaselineTypeABot):
-    """Free-movement Type A: information-maximizing (binary-search style) scans.
+    # Free-movement Type A: information-maximizing (binary-search style) scans.
  
-    Every open cell is a possible scan spot.  A scan from cell c has three
-    outcomes over the n remaining candidates:
-        FOUND    (c itself is a candidate)           -> own cells
-        PING     (other candidates inside c's window) -> n_in - own cells
-        NO_PING  (candidates outside the window)      -> n - n_in cells
-    Since the posterior stays uniform on whatever survives, the expected
-    information gain is exactly the Shannon entropy of that 3-way split, so we
-    scan from the cell whose split is the most even.  With lookahead=True we also
-    add the best entropy obtainable on the NEXT scan for the top `beam` first
-    scans (a 2-step search), which avoids greedy choices that leave awkward,
-    badly-shaped leftovers.
-    """
+    # Every open cell is a possible scan spot.  A scan from cell c has three
+    # outcomes over the n remaining candidates:
+    #     FOUND    (c itself is a candidate)           -> own cells
+    #     PING     (other candidates inside c's window) -> n_in - own cells
+    #     NO_PING  (candidates outside the window)      -> n - n_in cells
+    # Since the posterior stays uniform on whatever survives, the expected
+    # information gain is exactly the Shannon entropy of that 3-way split, so we
+    # scan from the cell whose split is the most even.  With lookahead=True we also
+    # add the best entropy obtainable on the NEXT scan for the top `beam` first
+    # scans (a 2-step search), which avoids greedy choices that leave awkward,
+    # badly-shaped leftovers.
+    
     tiebreak = "nearest"  # "nearest", "packed", "corner" or "random"
  
     def __init__(self, ship, start, lostBot, k, rng=None,
@@ -924,21 +907,21 @@ class FreeTypeABot(BaselineTypeABot):
 
 
 class FreeTypeBBot(BaselineTypeBBot):
-    """Free-movement Type B: scan where the reading is most informative.
+    # Free-movement Type B: scan where the reading is most informative.
  
-    Belief update is the same Bayes rule as the baseline.  The decision is
-    different: instead of walking to the single most likely cell (which is
-    only sensible when walking is what costs you), we pick the scan cell c that
-    maximizes the mutual information between the scan outcome and LostBot's
-    location:  I(c) = H(outcome) - E_target[ H(outcome | target) ].
-    Outcome distribution at c:  FOUND w.p. p_c; PING w.p. sum_{t!=c} p_t P(c,t);
-    NO_PING otherwise.  Given the target the outcome is a coin flip with
-    P(c,t)=exp(-alpha(d-1)) (or certain, if t == c).
-    Endgame: once the most likely cell holds >= `endgame` of the probability
-    mass we just stand on it, because a FOUND ends the search outright.
-    The (n x n) ping table is built once per bot, so each decision is a pair of
-    matrix-vector products.
-    """
+    # Belief update is the same Bayes rule as the baseline.  The decision is
+    # different: instead of walking to the single most likely cell (which is
+    # only sensible when walking is what costs you), we pick the scan cell c that
+    # maximizes the mutual information between the scan outcome and LostBot's
+    # location:  I(c) = H(outcome) - E_target[ H(outcome | target) ].
+    # Outcome distribution at c:  FOUND w.p. p_c; PING w.p. sum_{t!=c} p_t P(c,t);
+    # NO_PING otherwise.  Given the target the outcome is a coin flip with
+    # P(c,t)=exp(-alpha(d-1)) (or certain, if t == c).
+    # Endgame: once the most likely cell holds >= `endgame` of the probability
+    # mass we just stand on it, because a FOUND ends the search outright.
+    # The (n x n) ping table is built once per bot, so each decision is a pair of
+    # matrix-vector products.
+    
  
     def __init__(self, ship, start, lostBot, alpha, rng=None, endgame=0.5):
         super().__init__(ship, start, lostBot, alpha, rng=rng)
